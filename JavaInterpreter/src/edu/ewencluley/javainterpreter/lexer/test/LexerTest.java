@@ -12,10 +12,16 @@ public class LexerTest {
 
 	@Test
 	public void testTokenize() {
-		assertEquals(Lexer.tokenize("System.out.println('Hello World');").size(), 1);
-		assertEquals(Lexer.tokenize("int x = 1;").size(), 4);
-		assertEquals(Lexer.tokenize("int x = 1;\n x = x + 1;").size(), 9);
-		assertEquals(Lexer.tokenize("public ClassName{ \nint x; \n}").size(), 5);
+		testWith("System.out.println('Hello World');", 1);
+		testWith("int x = 1;", 4);
+		testWith("int x = 1;\n x = x + 1;", 9);
+		testWith("public ClassName{ \nint x; \n}", 5);
+	}
+	
+	private void testWith(String s, int expectedLength){
+		List<String> tokens = Lexer.tokenize(s);
+		System.out.println(tokens);
+		assertEquals(tokens.size(), expectedLength);
 	}
 
 }
