@@ -1,16 +1,29 @@
 package edu.ewencluley.javainterpreter.lexer;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 import org.reflections.Reflections;
+import org.reflections.scanners.ResourcesScanner;
+import org.reflections.scanners.SubTypesScanner;
+import org.reflections.util.ClasspathHelper;
+import org.reflections.util.ConfigurationBuilder;
+import org.reflections.util.FilterBuilder;
+
+import com.google.common.collect.Iterators;
+import com.google.common.collect.PeekingIterator;
+import com.google.common.reflect.ClassPath;
 
 import edu.ewencluley.javainterpreter.AvailibleClassesInPath;
 import edu.ewencluley.javainterpreter.Workbench;
 import edu.ewencluley.javainterpreter.syntax.Construct;
 import edu.ewencluley.javainterpreter.syntax.Line;
+import edu.ewencluley.javainterpreter.syntax.MethodCall;
 
 
 public class LineConstructor {
@@ -20,13 +33,33 @@ public class LineConstructor {
 		Line currentLine = new Line();
 		int parenthisisOpen = 0;
 		boolean newLine = true;
-		for(String token:tokens){
+		PeekingIterator<String> tokenIterator = Iterators.peekingIterator(tokens.iterator());
+		while(tokenIterator.hasNext()){
+			String token = tokenIterator.next();
 			if(newLine){
-				
-				if(token.startsWith("for")){
+				if(token.equals("import")){
+					currentLine.add(token);
+					currentLine.add(importStatement(tokenIterator));
+				}else if(token.startsWith("class")){
 					currentLine = new Construct();
+				}else if(token.matches("(\\w+(.?))*(\\w)+\\([\\w\\\"\\)]*")){
+					String methodName = token.substring(token.lastIndexOf(".", token.indexOf("("))+1, token.indexOf("("));
+					String objectName = token.substring(0, token.indexOf("."));
+					Object object = Workbench.variableByName(objectName);
+					//currentLine = new MethodCall();
+					System.out.println(methodName); 
 				}else{
-					currentLine = new Line();
+					String fqName = Workbench.getQualifiedClassName(token);
+					if(fqName != null){
+						String varName = tokenIterator.next();
+						Workbench.newVariable(varName, null);
+						if(tokenIterator.peek().equals("=")){
+							tokenIterator.next();
+							expression(tokenIterator);
+						}
+					}else{
+						currentLine = new Line();
+					}
 				}
 				newLine = false;
 			}
@@ -44,24 +77,25 @@ public class LineConstructor {
 		return lines;
 	}
 	
-	private boolean importStatement(List<String> tokens){
-		if(tokens.get(0).equals("import")){
-			String packageName = tokens.get(1);
-			if(packageName.endsWith("*")){
-				Reflections reflections = new Reflections(packageName.replace(".*", ""));
-				Set<Class<? extends Object>> allClasses = reflections.getSubTypesOf(Object.class);
-				for(Class<?extends Object> clazz: allClasses){
-					loadClass(clazz.getCanonicalName());
+	private static String importStatement(PeekingIterator<String> tokens){
+		String packageName = tokens.next();
+		if(packageName.endsWith("*")){
+			ClassPath classpath;
+			try {
+				classpath = ClassPath.from(ClassLoader.getSystemClassLoader());
+				for (ClassPath.ClassInfo classInfo : classpath.getTopLevelClasses(packageName.replace(".*", ""))) {
+					loadClass(classInfo.getName());
 				}
-			}else{
-				loadClass(packageName);
+			} catch (IOException e) {
+				e.printStackTrace();
 			}
-			return true;
+		}else{
+			loadClass(packageName);
 		}
-		return false;
+		return packageName;
 	}
 	
-	private void loadClass(String className){
+	private static void loadClass(String className){
 		try {
 			Class<? extends Object> clazz = ClassLoader.getSystemClassLoader().loadClass(className);
 			AvailibleClassesInPath.addClass(clazz);
@@ -74,7 +108,7 @@ public class LineConstructor {
 	}
 	
 	
-	private boolean expression(List<String> tokens){
+	private static boolean expression(PeekingIterator<String> tokens){
 		//if(className(tokens.get(0))){
 			
 		//}

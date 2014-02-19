@@ -6,10 +6,14 @@ import java.util.Set;
 import com.google.common.reflect.ClassPath.ClassInfo;
 
 public class Workbench {
-	private static HashMap<String, Object> existingVariables;
+	private static HashMap<String, Object> existingVariables = new HashMap<String, Object>();
 	
 	public static boolean variableExists(String varName){
 		return existingVariables.containsKey(varName);
+	}
+	
+	public static Object variableByName(String varName){
+		return existingVariables.get(varName);
 	}
 	
 	public static void newVariable(String name, Object obj){
@@ -25,5 +29,5 @@ public class Workbench {
 			}
 		}
 		return null;
-	}
+	}	
 }
