@@ -21,6 +21,7 @@ import com.google.common.reflect.ClassPath;
 
 import edu.ewencluley.javainterpreter.AvailibleClassesInPath;
 import edu.ewencluley.javainterpreter.Workbench;
+import edu.ewencluley.javainterpreter.exceptions.InvalidTypeException;
 import edu.ewencluley.javainterpreter.syntax.Construct;
 import edu.ewencluley.javainterpreter.syntax.Line;
 import edu.ewencluley.javainterpreter.syntax.MethodCall;
@@ -28,7 +29,7 @@ import edu.ewencluley.javainterpreter.syntax.MethodCall;
 
 public class LineConstructor {
 
-	public static List<Line> splitLines(List<String> tokens){
+	/*public static List<Line> splitLines(List<String> tokens){
 		ArrayList<Line> lines = new ArrayList<Line>();
 		Line currentLine = new Line();
 		int parenthisisOpen = 0;
@@ -75,10 +76,10 @@ public class LineConstructor {
 			}
 		}
 		return lines;
-	}
+	}*/
 	
-	private static String importStatement(PeekingIterator<String> tokens){
-		String packageName = tokens.next();
+	private static String importStatement(List<String> tokens){
+		String packageName = tokens.get(1);
 		if(packageName.endsWith("*")){
 			ClassPath classpath;
 			try {
@@ -108,36 +109,140 @@ public class LineConstructor {
 	}
 	
 	
-	private static boolean expression(PeekingIterator<String> tokens){
-		//if(className(tokens.get(0))){
-			
-		//}
+	private static boolean expression(List<String> tokens) throws InvalidTypeException{
+		if(booleanLiteral(tokens.get(0))){
+			removeTokens(tokens, 1);
+			return true;
+		}
+		else if(integerLiteral(tokens.get(0))){
+			removeTokens(tokens, 1);
+			return true;
+		}else if(floatLiteral(tokens.get(0))){
+			removeTokens(tokens, 1);
+			return true;
+		}else if(doubleLiteral(tokens.get(0))){
+			removeTokens(tokens, 1);
+			return true;
+		}else if(thisLiteral(tokens.get(0))){
+			removeTokens(tokens, 1);
+			return true;
+		}else if(identifier(tokens.get(0))){
+			removeTokens(tokens, 1);
+			return true;
+		}else if(expression(tokens)){
+			if(tokens.get(0).equals("&&") || tokens.get(0).equals("||") 
+					|| tokens.get(0).equals("+") || tokens.get(0).equals("-") || tokens.get(0).equals("*") || tokens.get(0).equals("/") 
+					|| tokens.get(0).equals("<") || tokens.get(0).equals(">") || tokens.get(0).equals(">=") || tokens.get(0).equals("<=")){
+				List<String> moddedList = tokens;
+				removeTokens(moddedList, 1);
+				if(expression(moddedList)){
+					tokens = moddedList;
+				}
+			}
+		}
 		return false;
 				
 	}
 	
-	/**
-	 * Gets the fully qualified class name if the class is visible, else it return null.
-	 * @param token the name of the class to find
-	 * @return the fully qualified name of the given class
-	 */
-	private String className(String token){
-		if(token.matches("[A-Za-z]\\w*")){
-			return "";//AvailibleClassesInPath.;
+	private static boolean thisLiteral(String token) {
+		if(token.equals("this")){
+			return true;
 		}
-		return "";
+		return false;
+	}
+
+	private static boolean booleanLiteral(String token) {
+		if(token.equals("true") || token.equals("false")){
+			return true;
+		}
+		return false;
 	}
 	
-	private boolean variableName(String token){
+	private static boolean integerLiteral(String token) {
+		if(token.matches("\\d+")){
+			return true;
+		}
+		return false;
+	}
+	private static boolean floatLiteral(String token) {
+		if(token.matches("\\d+(\\.\\d+)?f")){
+			return true;
+		}
+		return false;
+	}
+	private static boolean doubleLiteral(String token) {
+		if(token.matches("\\d+(\\.\\d+)?")){
+			return true;
+		}
+		return false;
+	}
+
+	public static void analyseSyntax(List<String> tokens) throws InvalidTypeException{
+		if(varDeclaration(tokens)){
+			System.out.println("found var declaration");
+			removeTokens(tokens, 3);
+		}
+		while(expression(tokens)){
+			System.out.println("found expression");
+			//removeTokens(tokens, 4);
+		}
+	}
+	
+	private static void removeTokens(List<String> tokens, int howMany){
+		for(int i=0; i< howMany; i++){
+			tokens.remove(0);
+		}
+	}
+	
+	
+	private static boolean varDeclaration(List<String> tokens) throws InvalidTypeException{
+		if(type(tokens.get(0)) != null){
+			if(identifier(tokens.get(1))){
+				if(tokens.get(2).equals(";")){
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	
+	private static String type(String token) throws InvalidTypeException{
+		if(token.endsWith("[]")){
+			token = token.substring(0, token.lastIndexOf("[")-1);
+			if(token.endsWith("[]")){
+				type(token);
+			}
+		}
+		switch(token){
+		case "byte":
+		case "short":
+		case "int":
+		case "long":
+		case "boolean":
+		case "double":
+		case "char":
+		case "float":
+			return token;
+		default:
+			if(Workbench.getQualifiedClassName(token) != null
+			&& Workbench.getQualifiedClassName(token).endsWith(token)){
+				return Workbench.getQualifiedClassName(token);
+			}
+			break;
+		}
+		//TODO line number;
+		return null;
+	}
+	
+	private static boolean identifier(String token){
 		if(token.matches("[A-Za-z0-9]+")){
-			Workbench.newVariable(token, null);
 			return true;
 		}
 		return false;
 	}
 	
 	private boolean existingVariableName(String token){
-		if(token.matches("[A-Za-z0-9]+") && Workbench.variableExists(token)){
+		if(Workbench.variableExists(token)){
 			return true;
 		}
 		return false;

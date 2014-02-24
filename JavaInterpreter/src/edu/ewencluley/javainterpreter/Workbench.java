@@ -24,7 +24,7 @@ public class Workbench {
 		HashMap<String,String> classes = AvailibleClassesInPath.getClasses();
 		Set<String> fqClasses = classes.keySet();
 		for(String fqClass:fqClasses){
-			if(fqClass.endsWith(name)){
+			if(fqClass != null && fqClass.endsWith(name)){
 				return classes.get(fqClass);
 			}
 		}

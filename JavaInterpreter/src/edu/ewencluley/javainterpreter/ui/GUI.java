@@ -14,6 +14,10 @@ import javax.swing.JTextPane;
 import javax.swing.LayoutStyle.ComponentPlacement;
 import javax.swing.JButton;
 
+import edu.ewencluley.javainterpreter.LexicalAnalyzer;
+import edu.ewencluley.javainterpreter.SyntaxAnalyser;
+import edu.ewencluley.javainterpreter.Token;
+import edu.ewencluley.javainterpreter.exceptions.InvalidTypeException;
 import edu.ewencluley.javainterpreter.lexer.Lexer;
 import edu.ewencluley.javainterpreter.lexer.LineConstructor;
 import edu.ewencluley.javainterpreter.syntax.Line;
@@ -85,8 +89,13 @@ public class GUI extends JFrame {
 		JButton btnRun = new JButton("Run");
 		btnRun.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
-				List<Line> lines = LineConstructor.splitLines(Lexer.tokenize(textPane.getText()));	 
-				System.out.println(lines);
+				LexicalAnalyzer lex = new LexicalAnalyzer(textPane.getText());
+				Token t = lex.getToken();
+				while (t.getLexem() != "eof"){
+					System.out.println(t);
+					t = lex.getToken();
+				}
+				System.out.println("!!!-Done-!!!");
 			}
 		});
 		panel_1.add(btnRun);
