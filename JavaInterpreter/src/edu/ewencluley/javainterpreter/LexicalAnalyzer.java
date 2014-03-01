@@ -5,6 +5,20 @@ import java.util.LinkedList;
 
 import org.apache.commons.lang3.StringUtils;
 
+import edu.ewencluley.javainterpreter.exceptions.InvalidCharacterException;
+import edu.ewencluley.javainterpreter.lexer.tokens.ArithmeticOperationToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.AssignmentToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.BitwiseOperationToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.BooleanOperationToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.ConstructToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.EndOfInputToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.IdentifierToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.LiteralToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.TokenTypes;
+import edu.ewencluley.javainterpreter.lexer.tokens.TokenTypes.LiteralTypes;
+import edu.ewencluley.javainterpreter.lexer.tokens.Token;
+import edu.ewencluley.javainterpreter.lexer.tokens.TypeToken;
+
 /**
  * The Lexical Analyzer
  * 
@@ -59,7 +73,7 @@ public class LexicalAnalyzer
 	 * Analyzes the character/characters and generates a token to represent it.
 	 * @return the current token found from a sequence of characters
 	 */
-	public Token getToken()
+	public Token getToken() throws InvalidCharacterException
 	{
 		while(Character.isWhitespace(currentChar)){
 			currentChar = getNextChar(); //if whitespace, skip over the whitespace
@@ -68,106 +82,111 @@ public class LexicalAnalyzer
 		//each of the following identify single character operators such as '=', '*', etc.
 		if(currentChar == '\b'){ //if the character is an "!" (returned from the parser once it reaches the end of file)
 			currentChar = getNextChar();
-			return new Token("eof","EndOfFile"); // return an end of file token.
+			return new EndOfInputToken("EndOfFile"); // return an end of file token.
 		}else if(currentChar=='+'){
 			currentChar = getNextChar();
 			if(currentChar == '+'){
 				currentChar = getNextChar();
-				return new Token("++", "IncrementOp");
+				return new ArithmeticOperationToken("++", TokenTypes.ArithmeticOperationTypes.INC_DEC);
 			}else{
 				backtrackedChars.add(currentChar);
-				return new Token("+", "AddOp");
+				return new ArithmeticOperationToken("+", TokenTypes.ArithmeticOperationTypes.ADDITION);
 			}
 		}else if(currentChar=='-'){
 			currentChar = getNextChar();
 			if(currentChar == '-'){
 				currentChar = getNextChar();
-				return new Token("--", "DecrementOp");
+				return new ArithmeticOperationToken("--", TokenTypes.ArithmeticOperationTypes.INC_DEC);
 			}else{
 				backtrackedChars.add(currentChar);
-				return new Token("-", "AddOp");
+				return new ArithmeticOperationToken("-", TokenTypes.ArithmeticOperationTypes.ADDITION);
 			}
 		}else if(currentChar=='*'){
 			currentChar = getNextChar();
-			return new Token("*", "MultOp");
+			return new ArithmeticOperationToken("*", TokenTypes.ArithmeticOperationTypes.MULTIPLICATION);
 		}else if(currentChar=='/'){
 			currentChar = getNextChar();
-			return new Token("/", "MultOp");
+			return new ArithmeticOperationToken("/", TokenTypes.ArithmeticOperationTypes.MULTIPLICATION);
 		}else if(currentChar=='%'){
 			currentChar = getNextChar();
-			return new Token("%", "ModulusOp");
+			return new ArithmeticOperationToken("%", TokenTypes.ArithmeticOperationTypes.MODULUS);
 		}else if(currentChar=='{'){
 			currentChar = getNextChar();
-			return new Token("{", "BlockOpen");
+			return new ConstructToken("{", TokenTypes.ConstructTypes.BLOCK_OPEN);
 		}else if(currentChar=='}'){
 			currentChar = getNextChar();
-			return new Token("}", "BlockClose");
+			return new ConstructToken("}", TokenTypes.ConstructTypes.BLOCK_CLOSE);
 		}else if(currentChar==','){
 			currentChar = getNextChar();
-			return new Token(",", "Comma");
+			return new ConstructToken(",", TokenTypes.ConstructTypes.COMMA);
 		}else if(currentChar==';'){
 			currentChar = getNextChar();
-			return new Token(";", "Semi-Colon");
+			return new ConstructToken(";", TokenTypes.ConstructTypes.SEMI_COLON);
 		}else if(currentChar=='('){
 			currentChar = getNextChar();
-			return new Token("(", "OpenParenthesis");
+			return new ConstructToken("(", TokenTypes.ConstructTypes.PARENTHISIS);
 		}else if(currentChar==')'){
 			currentChar = getNextChar();
-			return new Token(")", "CloseParenthesis");
-		//the next section checks if characters form words, i.e. are letters. The characters must be lowercase as defined in the language dl0 
+			return new ConstructToken(")", TokenTypes.ConstructTypes.PARENTHISIS);
+		}else if(currentChar=='['){
+			currentChar = getNextChar();
+			return new ConstructToken("[", TokenTypes.ConstructTypes.SQ_PARENTHISIS);
+		}else if(currentChar==']'){
+			currentChar = getNextChar();
+			return new ConstructToken("]", TokenTypes.ConstructTypes.SQ_PARENTHISIS);
 		}else if(currentChar=='~'){
 			currentChar = getNextChar();
-			return new Token("~", "BitwiseComplement");
+			return new BitwiseOperationToken("~", TokenTypes.BitwiseOperationTypes.COMPLEMENT);
 		}else if(currentChar=='!'){
 			currentChar = getNextChar();
 			if(currentChar == '='){
 				currentChar = getNextChar();
-				return new Token("!=", "BooleanNotEqual");
+				return new BooleanOperationToken("!=", TokenTypes.BooleanOperationTypes.NOT_EQUAL);
 			}else{
 				backtrackedChars.add(currentChar);
-				return new Token("!", "BooleanNot");
+				return new BooleanOperationToken("!", TokenTypes.BooleanOperationTypes.NOT);
 			}
-			
 		}else if(currentChar=='|'){
 			currentChar = getNextChar();
 			if(currentChar == '|'){
 				currentChar = getNextChar();
-				return new Token("||", "BooleanOr");
+				return new BooleanOperationToken("||", TokenTypes.BooleanOperationTypes.OR);
 			}else{
 				backtrackedChars.add(currentChar);
-				return new Token("|", "BitwiseOr");
+				return new BitwiseOperationToken("|", TokenTypes.BitwiseOperationTypes.OR);
 			}
 		}else if(currentChar=='&'){
 			currentChar = getNextChar();
 			if(currentChar == '&'){
 				currentChar = getNextChar();
-				return new Token("&&", "BooleanAnd");
+				return new BooleanOperationToken("&&", TokenTypes.BooleanOperationTypes.AND);
 			}else{
 				backtrackedChars.add(currentChar);
-				return new Token("&", "BitwiseAnd");
+				return new BitwiseOperationToken("&", TokenTypes.BitwiseOperationTypes.AND);
 			}
 		}else if(currentChar=='='){
 			currentChar = getNextChar();
 			if(currentChar == '='){
 				currentChar = getNextChar();
-				return new Token("==", "BooleanEquality");
+				return new BooleanOperationToken("!=", TokenTypes.BooleanOperationTypes.EQUAL);
 			}else{
 				backtrackedChars.add(currentChar);
-				return new Token("=", "AssignmentOperator");
+				return new AssignmentToken("=");
 			}
 		}else if(currentChar == '^'){
 			currentChar = getNextChar();
-			return new Token("^", "BitwiseXOR");
+			return new BitwiseOperationToken("^", TokenTypes.BitwiseOperationTypes.XOR);
 		}else if(currentChar=='<'){
 			currentChar = getNextChar();
 			if(currentChar == '<'){
 				currentChar = getNextChar();
-				return new Token("<<", "BitwiseLeftShift");
+				return new BitwiseOperationToken("<<", TokenTypes.BitwiseOperationTypes.LEFT_SHIFT_SIGNED);
 			}else if(currentChar == '='){
-				return new Token("<", "BooleanLessThanOrEqual");
+				currentChar = getNextChar();
+				return new BooleanOperationToken("<=", TokenTypes.BooleanOperationTypes.LESS_EQUAL);
 			}else{
 				backtrackedChars.add(currentChar);
-				return new Token("<", "BooleanLessThan");
+				return new BooleanOperationToken("<", TokenTypes.BooleanOperationTypes.LESS);
 			}
 		}else if(currentChar=='>'){
 			currentChar = getNextChar();
@@ -175,16 +194,17 @@ public class LexicalAnalyzer
 				currentChar = getNextChar();
 				if(currentChar == '>'){
 					currentChar = getNextChar();
-					return new Token(">>>", "BitwiseUnsignedRightShift");
+					return new BitwiseOperationToken(">>>", TokenTypes.BitwiseOperationTypes.RIGHT_SHIFT_UNSIGNED);
 				}else{
 					backtrackedChars.add(currentChar);
-					return new Token(">>", "BitwiseRightShift");
+					return new BitwiseOperationToken(">>", TokenTypes.BitwiseOperationTypes.RIGHT_SHIFT_SIGNED);
 				}
 			}else if(currentChar == '='){
-				return new Token(">=", "BooleanGreaterThanOrEqual");
+				currentChar = getNextChar();
+				return new BooleanOperationToken(">=", TokenTypes.BooleanOperationTypes.GREATER_EQUAL);
 			}else{
 				backtrackedChars.add(currentChar);
-				return new Token(">", "BooleanGreaterThan");
+				return new BooleanOperationToken(">", TokenTypes.BooleanOperationTypes.GREATER);
 			}
 		}else if(currentChar == '\"'){
 			String word = new String(); //new empty string
@@ -193,7 +213,7 @@ public class LexicalAnalyzer
 				word += currentChar;
 				currentChar =getNextChar();
 			}
-			return new Token(word, "StringLiteral");
+			return new LiteralToken(word, TokenTypes.LiteralTypes.STRING);
 		}else if(currentChar == '\''){
 			String word = new String(); //new empty string
 			currentChar = getNextChar();
@@ -203,25 +223,38 @@ public class LexicalAnalyzer
 			}
 			currentChar =getNextChar();
 			if(word.length() == 1){
-				return new Token(word, "CharLiteral");
+				return new LiteralToken(word, TokenTypes.LiteralTypes.CHAR);
 			}else{
-				return new Token(word, "StringLiteral");
+				return new LiteralToken(word, TokenTypes.LiteralTypes.STRING);
 			}
 		}else if(Character.isAlphabetic(currentChar)){
 			String word = new String(""+currentChar); //puts the first character into the "word"
 			currentChar = getNextChar();
-			while(Character.isAlphabetic(currentChar) || Character.isDigit(currentChar) || currentChar == '\"'){ //while the next character is a lowercase Letter of Digit it is added to the word. 
+			while(Character.isJavaIdentifierPart(currentChar) || currentChar == '[' || currentChar == ']'){ //while the next character is a lowercase Letter of Digit it is added to the word. 
 				//If it is any other character, the loop will end
 				word += currentChar;
 				currentChar =getNextChar();
 			}
-			//these cases are if the word found matches one of the system reserved words (int or print)
-			if(word.equals("instanceof")){return new Token("instanceof", "BooleanInstanceOf");}
-			else if(word.equals("null")){return new Token("null", "NullLiteral");}
-			else if(word.equals("true") || word.equals("false")){return new Token(word, "BooleanLiteral");}
-			else if(Utilities.isValidType(word)){return new Token(word, "Type");}
+			if(word.equals("instanceof")){return new BooleanOperationToken("instanceof", TokenTypes.BooleanOperationTypes.INSTANCEOF);}
+			else if(word.equals("class")){return new ConstructToken("class", TokenTypes.ConstructTypes.CLASS_DEF);}
+			else if(word.equals("extends")){return new ConstructToken("extends", TokenTypes.ConstructTypes.EXTENDS);}
+			else if(word.equals("implements")){return new ConstructToken("implements", TokenTypes.ConstructTypes.IMPLEMENTS);}
+			else if(word.equals("public")){return new ConstructToken("public", TokenTypes.ConstructTypes.ACCESS_MODIFIER);}
+			else if(word.equals("private")){return new ConstructToken("private", TokenTypes.ConstructTypes.ACCESS_MODIFIER);}
+			else if(word.equals("protected")){return new ConstructToken("protected", TokenTypes.ConstructTypes.ACCESS_MODIFIER);}
+			else if(word.equals("default")){return new ConstructToken("default", TokenTypes.ConstructTypes.ACCESS_MODIFIER);}
+			else if(word.equals("return")){return new ConstructToken("return", TokenTypes.ConstructTypes.RETURN);}
+			else if(word.equals("for")){return new ConstructToken("for", TokenTypes.ConstructTypes.FOR);}
+			else if(word.equals("if")){return new ConstructToken("if", TokenTypes.ConstructTypes.IF);}
+			else if(word.equals("else")){return new ConstructToken("else", TokenTypes.ConstructTypes.ELSE);}
+			else if(word.equals("static")){return new ConstructToken("static", TokenTypes.ConstructTypes.STATIC);}
+			else if(word.equals("abstract")){return new ConstructToken("abstract", TokenTypes.ConstructTypes.ABSTRACT);}
+			else if(word.equals("new")){return new ConstructToken("new", TokenTypes.ConstructTypes.NEW);}
+			else if(word.equals("null")){return new LiteralToken(word, TokenTypes.LiteralTypes.NULL);}
+			else if(word.equals("true") || word.equals("false")){return new LiteralToken(word, TokenTypes.LiteralTypes.BOOLEAN);}
+			else if(Utilities.isValidType(word)){return new TypeToken(word);}
 			else{ //if the word is not a system reserved word then it is returned as an identifier.
-				return new Token(word, "Identifier");
+				return new IdentifierToken(word);
 			}
 		//the last section checks if the characters form a constant.
 		}else if(Character.isDigit(currentChar)){
@@ -233,22 +266,25 @@ public class LexicalAnalyzer
 			}
 			if((currentChar == 'f' || currentChar == 'F') && StringUtils.countMatches(word, ".") == 1){
 				currentChar = getNextChar();
-				return new Token(word + currentChar, "FloatLiteral");
+				return new LiteralToken(word, TokenTypes.LiteralTypes.FLOAT);
 			}else if(StringUtils.countMatches(word, ".") == 1){
 				if((currentChar == 'd' || currentChar == 'D')){
 					currentChar =getNextChar();
 				}
-				return new Token(word + currentChar, "DoubleLiteral");
+				return new LiteralToken(word, TokenTypes.LiteralTypes.DOUBLE);
 			}else if((currentChar == 'l' || currentChar == 'L') && StringUtils.countMatches(word, ".") == 0){
 				currentChar =getNextChar();
-				return new Token(word + currentChar, "LongLiteral");
+				return new LiteralToken(word, TokenTypes.LiteralTypes.LONG);
 			}else{
-				return new Token(word + currentChar, "IntegerLiteral");
+				return new LiteralToken(word, TokenTypes.LiteralTypes.INTEGER);
 			}
-		}else{ //if none of the above conditions are met, the character found is not recognized as part of of the dl0 grammar
+		}else if(currentChar == '.'){
+			currentChar =getNextChar();
+			return new ConstructToken(".", TokenTypes.ConstructTypes.DOT);
+		}else{ //if none of the above conditions are met, the character found is not recognized as part of of the java grammar
 			char lastChar=currentChar;
 			currentChar = getNextChar();
-			return new Token("error on character:"+lastChar,"Error"); //an error token is returned
+			throw new InvalidCharacterException("error on character:"+lastChar); //an error token is returned
 		}
 	}
 }

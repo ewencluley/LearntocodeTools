@@ -3,8 +3,6 @@ package edu.ewencluley.javainterpreter;
 import java.util.HashMap;
 import java.util.Set;
 
-import edu.ewencluley.javainterpreter.exceptions.InvalidTypeException;
-
 public class Utilities {
 	
 	public static boolean isValidType(String token){
@@ -28,10 +26,11 @@ public class Utilities {
 		case "double":
 		case "char":
 		case "float":
+		case "void": //not really a type but sort of is
 			return token;
 		default:
 			if(getQualifiedClassName(token) != null
-			&& getQualifiedClassName(token).endsWith("."+token)){
+			&& getQualifiedClassName(token).endsWith(token)){
 				return getQualifiedClassName(token);
 			}
 			break;
@@ -44,7 +43,7 @@ public class Utilities {
 		HashMap<String,String> classes = AvailibleClassesInPath.getClasses();
 		Set<String> fqClasses = classes.keySet();
 		for(String fqClass:fqClasses){
-			if(fqClass != null && fqClass.endsWith(name)){
+			if(fqClass != null && fqClass.endsWith("."+name)){
 				return classes.get(fqClass);
 			}
 		}

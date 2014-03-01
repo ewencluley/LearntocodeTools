@@ -4,6 +4,18 @@ import java.io.*;
 import java.util.HashMap;
 import java.util.Stack;
 
+import edu.ewencluley.javainterpreter.exceptions.InvalidCharacterException;
+import edu.ewencluley.javainterpreter.lexer.tokens.ArithmeticOperationToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.AssignmentToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.BitwiseOperationToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.BooleanOperationToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.ConstructToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.IdentifierToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.LiteralToken;
+import edu.ewencluley.javainterpreter.lexer.tokens.Token;
+import edu.ewencluley.javainterpreter.lexer.tokens.TokenTypes;
+import edu.ewencluley.javainterpreter.lexer.tokens.TypeToken;
+
 /**SyntaxAnalyser will get tokens from the Lexical Analyser and see if they adhear to the dl0 syntax. 
  * It works as a top down recursive parser. It generates and prints a parse tree this can be used by a code generator to create code.
  * 
@@ -39,6 +51,10 @@ public class SyntaxAnalyser {
 		getNextToken();
 		getNextToken();
 	}
+	
+	public void start(){
+		statement();
+	}
 
 
 	//***********************************************************************************************************
@@ -46,274 +62,236 @@ public class SyntaxAnalyser {
 	//*****************************START OF RECOGNIZER METHODS***************************************************
 	//***********************************************************************************************************
 	//***********************************************************************************************************
-	private void factor()
-	{
-		if(token.equals(new Token("", "Constant"))){
-			recognised("Factor:Constant");
-			if(nodeStack.peek() != null){
-				//check if there is a 's-' on the stack before the constant to be added. this will make it a negative number
-				if(nodeStack.peek().getRoot().equals("s-") && nodeStack.peek().isLeaf()){
-					nodeStack.pop();
-					nodeStack.push(new SyntaxTreeNode("-"+token.getLexem()));
-				} else {
-					nodeStack.push(new SyntaxTreeNode(token.getLexem())); // if its not got a - before it, just put it in
-				}
-			}else{
-				nodeStack.push(new SyntaxTreeNode(token.getLexem()));// if its going to be the first statement in the stack, just put it in
-			}
-
-		} else if(token.equals(new Token("", "Identifier"))){
-			//checks if the identifier has been declared, i.e. is in the Symbol Table
-			if(!symbolTable.containsKey(token.getLexem())){
-				error("Variable not declared:"+token.getLexem());
-			}else{
-				//nodeStack.push(new SyntaxTreeNode(token.getLexem()));
-				recognised("Factor:Identifier");
-				if(!nodeStack.isEmpty()){
-					//check if there is a 's-' on the stack before the constant to be added. this will make it a negative number
-					if(nodeStack.peek().getRoot().equals("s-") && nodeStack.peek().isLeaf()){
-						nodeStack.pop();
-						nodeStack.push(new SyntaxTreeNode("-"+token.getLexem()));
-					} else {
-						nodeStack.push(new SyntaxTreeNode(token.getLexem())); // if its not got a - before it, just put it in
+	
+	private void varDeclaration(){
+		if(token instanceof TypeToken){
+			getNextToken();
+			if(token instanceof IdentifierToken){
+				getNextToken();
+				if(token instanceof ConstructToken && ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.SEMI_COLON)){
+					recognised("var declaration");
+					getNextToken();
+				}else if(token instanceof AssignmentToken){
+					getNextToken();
+					expression();
+					if(token instanceof ConstructToken && ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.SEMI_COLON)){
+						recognised("var declaration with assignment");
+						getNextToken();
+					}else{
+						error("expected ; after expression");
 					}
-				}else{
-					nodeStack.push(new SyntaxTreeNode(token.getLexem()));// if its going to be the first statement in the stack, just put it in
 				}
 			}
-
-		} else if(token.equals(new Token("(", "OpenParenthesis"))){
+		}
+	}
+	
+	private void type(){
+		if(token instanceof TypeToken){
+			getNextToken();
+			recognised("Type");
+		}
+	}
+	
+	
+	private void expression(){
+		//IDENTIFIER
+		if(token instanceof IdentifierToken && !operator(nextToken)){
+			getNextToken();
+			recognised("Expression - Identifier");
+		}//LITERAL
+		else if(token instanceof LiteralToken && !operator(nextToken)){
+			getNextToken();
+			recognised("Expression - Literal");
+		}//( EXPRESSION )
+		else if(token instanceof ConstructToken && 
+				((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.PARENTHISIS) && 
+				token.getLexem().equals("(")){
 			getNextToken();
 			expression();
-
-			if(token.equals(new Token(")", "CloseParenthesis"))){
-				recognised("Factor:(expression)");
-			} else {
-				error("')' expected");
+			if(token instanceof ConstructToken && 
+					((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.PARENTHISIS) && 
+					token.getLexem().equals(")")){
+				getNextToken();
+				recognised("Expression - ( Expression )");
+			}
+		}//NOT EXPRESSION
+		else if(token instanceof BooleanOperationToken &&
+				((BooleanOperationToken)token).getType().equals(TokenTypes.BooleanOperationTypes.NOT)){
+			getNextToken();
+			expression();
+			recognised("Expression - ! Expression");
+		}//NEW TYPE OR ARRAY
+		else if(token instanceof ConstructToken && 
+				((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.NEW)){
+			getNextToken();
+			if(token instanceof TypeToken){
+				getNextToken();
+				if(token instanceof ConstructToken && ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.PARENTHISIS)){
+					if(((ConstructToken)token).getLexem().equals("(")){
+						getNextToken();
+						if(!((ConstructToken)token).getLexem().equals(")")){
+							getNextToken();
+							expression();
+							if(((ConstructToken)token).getLexem().equals(")")){
+								getNextToken();
+								recognised("Expression - new type ( expression )");
+							}
+						}else{
+							getNextToken();
+							recognised("Expression - new type ()");
+						}
+					}else if(((ConstructToken)token).getLexem().equals("[")){
+						getNextToken();
+						if(!((ConstructToken)token).getLexem().equals("]")){
+							getNextToken();
+							expression();
+							if(((ConstructToken)token).getLexem().equals("]")){
+								getNextToken();
+								recognised("Expression - new type [ expression ]");
+							}
+						}else{
+							getNextToken();
+							error("expected expression in new type []");
+						}
+					}
+				}
+			}
+		}
+		//EXPRESSION OPERATOR EXPRESSION
+		else if(token instanceof LiteralToken || token instanceof IdentifierToken){
+			getNextToken();
+			if(operator(token)){
+				getNextToken();
+				expression();
+				recognised("Expression - expression operator expression");
 			}
 		}else{
-			error("Factor expected.");
+			error("Expression - expected expression");
 		}
-		recognised("Factor");
 	}
-	private void divTerm()
-	{
-		factor();
-		getNextToken();
-		while(token.equals(new Token("*/", "MultOp"))&&token.getLexem().equals("/")){
-			nodeStack.push(new SyntaxTreeNode(token.getLexem()));
-			getNextToken();
-			factor();
-			getNextToken();
-
-			statementBuild();
-		}
-		recognised("Term");
-	}
-
-	private void term()
-	{
-		divTerm();
-		while(token.equals(new Token("*/", "MultOp"))&&token.getLexem().equals("*")){
-			nodeStack.push(new SyntaxTreeNode(token.getLexem()));
-			getNextToken();
-			divTerm();
-
-			statementBuild();
-		}
-		recognised("Term");
-	}
-
-	private void addExpression()
-	{
-		if(token.equals(new Token("+-", "AddOp"))){
-			SyntaxTreeNode sign = new SyntaxTreeNode("s"+ token.getLexem()); //s- or s+ is used to denote a sign for a constant or an identifier.
-			nodeStack.push(sign);
-			getNextToken();
-		}
-		term();
-		while(token.equals(new Token("+-", "AddOp"))&&token.getLexem().equals("+")){
-			nodeStack.push(new SyntaxTreeNode(token.getLexem()));
-			getNextToken();
-			term();
-
-			statementBuild();
-		}
-		recognised("Expression");
-	}
-
-	private void expression()
-	{
-		if(token.equals(new Token("+-", "AddOp"))){
-			SyntaxTreeNode sign = new SyntaxTreeNode("s"+ token.getLexem()); //s- or s+ is used to denote a sign for a constant or an identifier.
-			nodeStack.push(sign);
-			getNextToken();
-		}
-		addExpression();
-		while(token.equals(new Token("+-", "AddOp"))&&token.getLexem().equals("-")){
-			nodeStack.push(new SyntaxTreeNode(token.getLexem()));
-			getNextToken();
-			addExpression();
-
-			statementBuild();
-		}
-		recognised("Expression");
-	}
-
-	private void assignment()
-	{
-		if(token.equals(new Token("", "Identifier"))){
-			factor();
-		}else{
-			error("Identifier Expected");
-		}
-		getNextToken();
-		if(token.equals(new Token("=", "AssignmentOperator"))){
-			nodeStack.push(new SyntaxTreeNode(token.getLexem()));//adds the equals operator
-			recognised("Assignment");
-		}else{
-			error("Assignment Operator Expected");
-		}
-		getNextToken();
-		expression();
-
-		statementBuild();
-	}
-
-	private void statement()
-	{
-		if(token.equals(new Token("", "Identifier"))&& nextToken.equals(new Token("=", "AssignmentOperator"))){
-			assignment();
-			recognised("Statement");
-			nodeStack.push(new SyntaxTreeNode("Statement"));//adds the statement node
-			nodeStack.push(null);//adds the null for the trees right node.
-			statementBuild();
-		} else if(token.equals(new Token("print", "PrintReservedWord"))){
-			printStatement();
-			recognised("Statement");
-			nodeStack.push(new SyntaxTreeNode("Statement"));//adds the statement node
-			nodeStack.push(null);//adds the null for the trees right node.
-			statementBuild();
-		} else {
-			empty();
-		}
-
-
-	}
-
-	private void statementlist()
-	{
-		statement();
-		while(token.equals(new Token(";", "Semi-Colon"))){
+	
+	private void statement(){
+		//{ STATEMENT }
+		if(token instanceof ConstructToken
+				&& ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.BLOCK_OPEN)){
 			getNextToken();
 			statement();
-		}
-		buildTree();
-		recognised("Statement List");
-	}
-
-	private void printStatement()
-	{
-		if(token.equals(new Token("print", "PrintReservedWord"))){
-			nodeStack.push(null);
-			nodeStack.push(new SyntaxTreeNode(token.getLexem()));
-			getNextToken();
-			recognised("Print statement");
-
-		} else {
-			error("Print command expected");
-		}
-		expression();
-		statementBuild();
-	}
-
-	private void iddef()
-	{
-		if(token.equals(new Token("", "Identifier"))){
-			//adds an identifier to the symbol table if not in it already. the locations in memory are stored 
-			//as a coefficient of their address within the section of memory specified for storage.
-			if(!symbolTable.containsKey(token.getLexem())){
-				symbolTable.put(token.getLexem(), symbolTable.size());
-			}else{
-				error("Variable already declared");
+			while(!(token instanceof ConstructToken)
+					|| !((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.BLOCK_CLOSE)){
+				statement();
 			}
-			if(nextToken.equals(new Token("=", "AssignmentOperator"))){//avoids adding the identifier if it is simply part of a declaration
-				nodeStack.push(new SyntaxTreeNode(token.getLexem()));
+			if(token instanceof ConstructToken
+					&& ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.BLOCK_CLOSE)){
+				getNextToken();
+				recognised("Statement- { Statement }");
 			}
-			getNextToken();
-			recognised("iddef");
-		} else {
-			error("Identifier Expected");
 		}
-		if(token.equals(new Token("=", "AssignmentOperator"))){
-			//if a iddef has an = in it then it is an assignment and must be added to the syntax tree. 
-			//simple identifiers without assignment do not.
-			nodeStack.push(new SyntaxTreeNode(token.getLexem()));
-			getNextToken();
+		//IF STATEMENT
+		else if(token instanceof ConstructToken
+				&& ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.IF)){
+			if(token instanceof ConstructToken
+					&& ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.PARENTHISIS)
+					&& ((ConstructToken)token).getLexem().equals("(")){
+				getNextToken();
+				expression();
+				if(token instanceof ConstructToken
+						&& ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.PARENTHISIS)
+						&& ((ConstructToken)token).getLexem().equals(")")){
+					getNextToken();
+					statement();
+					if(token instanceof ConstructToken
+							&& ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.ELSE)){
+						getNextToken();
+						statement();
+						recognised("Statement - if else construct");
+					}else{
+						recognised("Statement - if construct");
+					}
+				}
+			}
+		}
+		//WHILE STATEMENT
+		else if(token instanceof ConstructToken
+				&& ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.WHILE)){
+			if(token instanceof ConstructToken
+					&& ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.PARENTHISIS)
+					&& ((ConstructToken)token).getLexem().equals("(")){
+				getNextToken();
+				expression();
+				if(token instanceof ConstructToken
+						&& ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.PARENTHISIS)
+						&& ((ConstructToken)token).getLexem().equals(")")){
+					getNextToken();
+					statement();
+					recognised("Statement - while construct");
+				}
+			}
+		}
+		
+		//TODO FOR loop
+		//TODO FOR EACH loop
+		
+		//ASSIGNMENT STATEMENT
+		else if(token instanceof IdentifierToken && nextToken instanceof AssignmentToken){
+			getNextToken();//move past identifier
+			getNextToken();//move past equals
 			expression();
-			statementBuild();
-			//it also needs to be built into a statement node so it can be added to the statement list in a logical fashion.
-			nodeStack.push(new SyntaxTreeNode("Statement"));
-			nodeStack.push(null);
-			statementBuild();
-		}
-
-	}
-
-	private void empty()
-	{
-		recognised("empty");
-	}
-
-	private void varDecl()
-	{
-		if(token.equals(new Token("int", "DeclarationReservedWord"))){
-			getNextToken();
-			iddef();
-			while(token.equals(new Token(",", "Comma"))){
-				getNextToken();
-				iddef();
-			}
-			recognised("VarDecl");
-		}else{
-			error("Variable not declared");
-		}
-	}
-
-	private void block()
-	{
-		if(token.equals(new Token("{", "BlockOpen"))){
-			getNextToken();
-			if(token.equals(new Token("int", "DeclarationReservedWord"))){
-				varDecl();
+			if(token instanceof ConstructToken
+					&& ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.SEMI_COLON)){
+				recognised("Statement - assignment statement");
 				getNextToken();
 			}
-
-			statementlist();
-			if(token.equals(new Token("}", "BlockClose"))){
-				recognised("Block");
+		}
+		//ARRAY ASSIGNMENT STATEMENT
+		else if(token instanceof IdentifierToken 
+				&& nextToken instanceof ConstructToken 
+				&& ((ConstructToken)nextToken).getType().equals(TokenTypes.ConstructTypes.SQ_PARENTHISIS)
+				&& ((ConstructToken)nextToken).getLexem().equals("[")){
+			getNextToken();//move past identifier
+			getNextToken();//move past [
+			expression();
+			if(token instanceof IdentifierToken 
+					&& ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.SQ_PARENTHISIS)
+					&& ((ConstructToken)token).getLexem().equals("]")){
+				getNextToken();
+				if(token instanceof AssignmentToken){
+					getNextToken();//move past =
+					expression();
+					if(token instanceof ConstructToken
+							&& ((ConstructToken)token).getType().equals(TokenTypes.ConstructTypes.SEMI_COLON)){
+						recognised("Statement - array assignment statement");
+					}else{
+						error("Statement - expected expression after =");
+					}
+				}else{
+					error("Statement - expected assignment");
+				}
+				recognised("Statement - array assignment statement");
 			}else{
-				error("} expected");
+				error("Statement - expected ] after expression");
 			}
-		}else{
-			error("{ expected. No program block found");
+			recognised("Statement - statement");
 		}
-
+		//VAR DECAL STATEMENT
+		else if(token instanceof TypeToken ){
+			varDeclaration();
+		}
+		else{
+			error("Statement -expected statement");
+		}
 	}
-
-	public boolean program()
-	{
-		block();
-		if(errorCount > 0){
-			return false;
-		}else{
-			System.out.println("**********************");
-			System.out.println("*****SYNTAX TREE******");
-			System.out.println("**********************");
-			preorder(treeRoot, 0);//prints out the syntax tree if the program is syntactically correct
+	
+	private boolean operator(Token token){
+		if(token instanceof ArithmeticOperationToken 
+				|| token instanceof BooleanOperationToken
+				|| token instanceof BitwiseOperationToken){
 			return true;
 		}
+		return false;
 	}
+	
+	
+	
 
 	//***********************************************************************************************************
 	//***********************************************************************************************************
@@ -324,7 +302,11 @@ public class SyntaxAnalyser {
 	private void getNextToken()
 	{
 		token = nextToken; //sets current token to the old next token
-		nextToken = theLex.getToken(); // sets the next token to the next token
+		try {
+			nextToken = theLex.getToken();
+		} catch (InvalidCharacterException e) {
+			e.printStackTrace();
+		} // sets the next token to the next token
 		if(token!=null){
 			System.out.println("Token: "+token); //prints out the token
 		}
@@ -342,76 +324,10 @@ public class SyntaxAnalyser {
 
 	private void recognised(String r)
 	{
-		System.out.println(r+" recognised.");
+		System.out.println("Recognised:"+r);
 	}
 
-	//builds a statement from the top 3 nodes on the stack.
-	private void statementBuild()
-	{
-		if(!nodeStack.isEmpty()){
-			SyntaxTreeNode right = nodeStack.pop();
-			if(!nodeStack.isEmpty()){
-				nodeStack.peek().setRight(right);
-				SyntaxTreeNode root = nodeStack.pop();
-				if(!nodeStack.isEmpty()){
-					root.setLeft(nodeStack.pop());
-					nodeStack.push(root);
-				}
-			}
-		}
-	}
-
-	//used to build a stack of statement nodes into a tree with the next statement as the right hand child of the current 
-	private void buildTree()
-	{
-		while(nodeStack.size()> 1){
-			SyntaxTreeNode right = nodeStack.pop();
-			nodeStack.peek().setRight(right);
-		}
-		if(!nodeStack.isEmpty()){
-			treeRoot = nodeStack.pop();
-		}
-	}
-	/**
-	 * Used to get the root node with the syntax tree attached
-	 * @return the syntax tree, null if not tree generated
-	 */
-	public SyntaxTreeNode getRootNode()
-	{
-		return treeRoot;
-	}
-
-	/**
-	 * Gets the symbolTable for use by other objects, e.g. code generation
-	 * @return symbolTable, a HashMap.
-	 */
-	public HashMap<String, Integer> getSymbolTable()
-	{
-		return symbolTable;
-	}
-
-	/**
-	 * Prints out the syntax tree using a recursive depth first preorder algorithm.
-	 * @param n the node to analyze
-	 * @param i the number of calls to the algorithm, e.g. for the root node this will be 0, for it's children, 1, etc.
-	 */
-	public void preorder(SyntaxTreeNode n, int i)
-	{
-		//correctly aligns the tabs to make the tree display correctly
-		String tabs = "";
-		for(int x=0; x<i; x++){
-			tabs+="  ";
-		}
-		System.out.println(tabs + n);
-		if(n.getDaughter("left") != null && n.getDaughter("left").getRoot() != "dummy"){ //dummy nodes are returned by the SyntaxTreeNodes  
-			System.out.print("LHS:");													 //instead of null objects. This means properties can 
-			preorder(n.getDaughter("left"), i+1);										 //be checked without NullPointerExceptions occuring.
-		}																				 //These dummys are ignored and not printed.
-		if(n.getDaughter("right") != null && n.getDaughter("right").getRoot() != "dummy"){
-			System.out.print("RHS:");
-			preorder(n.getDaughter("right"), i+1);
-		}
-	}
+	
 
 
 }
